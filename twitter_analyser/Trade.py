@@ -1,12 +1,12 @@
-
-class Tweet:
+class Trade:
     def __init__(self):
         pass
 
-class TweetList:
+class TradeList:
     def __init__(self):
         pass
 
-class TweetDA:
+class TradeDA:
     def __init__(self):
         pass
+
