@@ -1,0 +1,5 @@
+twitterscraper 
+spacy
+numpy
+yfinance
+pandas
