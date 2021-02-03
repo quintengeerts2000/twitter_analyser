@@ -5,6 +5,7 @@ class Tweet:
 
 class TweetList:
     def __init__(self):
+        self.id = 0
         pass
 
 class TweetDA:

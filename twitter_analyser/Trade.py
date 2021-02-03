@@ -4,6 +4,7 @@ class Trade:
 
 class TradeList:
     def __init__(self):
+        self.id = 0
         pass
 
 class TradeDA:
