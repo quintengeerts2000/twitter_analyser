@@ -89,10 +89,10 @@ class TwitterUserDA:
     def load_user(self, id=None, user=None):
         self.cursor = self.conn.cursor()
         if id is not None:
-            out = self.cursor.execute('SELECT * FROM TwitterUser WHERE id = {}'.format(str(id))).fetchall()[0]
+            out = self.cursor.execute('SELECT * FROM TwitterUser WHERE id = {}'.format(str(id))).fetchone()
             self.conn.commit()
         elif user is not None:
-            out = self.cursor.execute("SELECT * FROM TwitterUser WHERE user = '{}'".format(user)).fetchall()[0]
+            out = self.cursor.execute("SELECT * FROM TwitterUser WHERE user = '{}'".format(user)).fetchone()
             self.conn.commit()
         else:
             raise ValueError("you need to use a name or id")
