@@ -22,7 +22,11 @@ class Tweet:
         self.URL = URL
 
     def __str__(self):
-        return "Tweet(username = {}, timestamp = {})".format(self.username, self.timestamp)
+        return "==========================================================================\n{}: {} * {} \n{}" \
+               " \n--------------------------------------------------------------------------".format(self.screen_name,
+                                                                                                      self.username,
+                                                                                                      self.timestamp,
+                                                                                                      self.text)
 
     def __eq__(self, other):
         for attr, value in self.__dict__.items():
@@ -126,3 +130,6 @@ class TweetDA:
                       retweets=out[7], emojis=out[8], comments=out[9], image_link=out[10], URL=out[11])
             output.add_tweet(_)
         return output
+
+DA = TweetDA()
+print(DA.load_all(username='@traderstewie'))
