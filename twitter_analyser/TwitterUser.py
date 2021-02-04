@@ -1,23 +1,27 @@
 import sqlite3
 from pathlib import Path
-from twitterscraper import User
+import hashlib
 
 from Tweet import Tweet, TweetList
 from StockComment import StockComment, StockCommentList, StockCommentDA
 from Trade import Trade, TradeList, TradeDA
 
-class TwitterUser(User):
-    def __init__(self, user="", full_name="", location="", blog="", date_joined="", id="", tweets=0, following=0,
-                 followers=0, likes=0, lists=0, is_verified=0, saved_tweets=None, trades=None, stock_comments=None):
-
-        User.__init__(self, user=user, full_name=full_name, location=location, blog=blog, date_joined=date_joined,
-                      id=id, tweets=tweets, following=following, followers=followers, likes=likes, lists=lists,
-                      is_verified=is_verified)
-
+class TwitterUser:
+    def __init__(self, username="", location="", description="", date_joined="", following='',
+                 followers=0, saved_tweets=None, trades=None, stock_comments=None):
+        self.username = username
+        #generate unique id from hash function
+        self.user_id = hashlib.sha1(str.encode(self.username)).hexdigest()
+        self.location = location
+        self.description = description
+        self.date_joined = date_joined
+        self.following = str(following)
+        self.followers = str(followers)
+        #initialise lists
         if saved_tweets is not None:
             self.saved_tweets = saved_tweets
         else:
-            self.saved_tweets = TweetList()
+            self.saved_tweets = TweetList(self.username)
         if trades is not None:
             self.trades = trades
         else:
@@ -28,7 +32,13 @@ class TwitterUser(User):
             self.stock_comments = StockCommentList()
 
     def __str__(self):
-        return 'Twitter user: name = {}, id = {}'.format(self.user, self.id)
+        return 'Twitter user: name = {}, id = {}'.format(self.username, self.user_id)
+
+    def __eq__(self, other):
+        return self.following == other.following and self.date_joined == other.date_joined and \
+               self.description == other.description and self.username == other.username and \
+               self.followers == other.followers and self.user_id == other.user_id
+
 
     def get_open_trades(self):
         pass
@@ -72,32 +82,33 @@ class TwitterUserDA:
         directory = str(path)
         self.conn = sqlite3.connect(directory + '/sqlite_db/twitter_users.db')
         self.cursor = self.conn.cursor()
-        self.cursor.execute("""CREATE TABLE IF NOT EXISTS TwitterUser (id string PRIMARY KEY, user string,
-                full_name string, location string, blog string, date_joined string, tweets integer,following integer,
-                followers integer, likes integer, lists integer, is_verified integer, saved_tweets integer, 
-                trades integer, stock_comments integer)""")
+        self.cursor.execute("""CREATE TABLE IF NOT EXISTS TwitterUser (user_id string PRIMARY KEY, username string,
+                location string, description string, date_joined string, following string, followers string)""")
         self.conn.commit()
 
     def save_user(self, usr):
         self.cursor = self.conn.cursor()
-        data = (usr.id, usr.user, usr.full_name, usr.location, usr.blog, usr.date_joined, usr.tweets, usr.following,
-                usr.followers, usr.likes, usr.lists, usr.is_verified, usr.saved_tweets.id, usr.trades.id,
-                usr.stock_comments.id)
-        self.cursor.execute('INSERT INTO TwitterUser VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', data)
+        data = (usr.user_id, usr.username, usr.location, usr.description, usr.date_joined, usr.following,
+                usr.followers)
+        self.cursor.execute('INSERT OR REPLACE INTO TwitterUser VALUES (?,?,?,?,?,?,?)', data)
         self.conn.commit()
 
-    def load_user(self, id=None, user=None):
+    def load_user(self, id=None, username=None):
         self.cursor = self.conn.cursor()
         if id is not None:
-            out = self.cursor.execute('SELECT * FROM TwitterUser WHERE id = {}'.format(str(id))).fetchone()
+            out = self.cursor.execute('SELECT * FROM TwitterUser WHERE user_id = {}'.format(str(id))).fetchone()
             self.conn.commit()
-        elif user is not None:
-            out = self.cursor.execute("SELECT * FROM TwitterUser WHERE user = '{}'".format(user)).fetchone()
+        elif username is not None:
+            out = self.cursor.execute("SELECT * FROM TwitterUser WHERE username = '{}'".format(username)).fetchone()
             self.conn.commit()
         else:
             raise ValueError("you need to use a name or id")
-        return TwitterUser(out[1], out[2], out[3], out[4], out[5], out[0], out[6], out[7], out[8], out[9], out[10],
-                           out[11], out[12], out[13], out[14])
+        print(out)
+        if out:
+            return TwitterUser(username=out[1], location=out[2], description=out[3], date_joined=out[4],
+                               following=out[5], followers=out[6])
+        else:
+            return None
 
     def save_list(self, user_list):
         DA = TwitterUserDA()
@@ -109,7 +120,6 @@ class TwitterUserDA:
         query = self.cursor.execute('SELECT * FROM TwitterUser').fetchall()
         output = TwitterUserList("output")
         for entry in query:
-            _ = TwitterUser(entry[1], entry[2], entry[3], entry[4], entry[5], entry[0], entry[6], entry[7], entry[8],
-                            entry[9], entry[10], entry[11], entry[12], entry[13], entry[14])
+            _ = TwitterUser(entry[1], entry[2], entry[3], entry[4], entry[5], entry[0], entry[6], entry[7], entry[8])
             output.add_user(_)
         return output

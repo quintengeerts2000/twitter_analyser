@@ -1,19 +1,25 @@
-from twitterscraper import Tweet as Tw
-import uuid
+import hashlib
 import sqlite3
 from pathlib import Path
+import datetime as dt
 
-class Tweet(Tw):
-    def __init__(self, screen_name, username, user_id, tweet_id, tweet_url, timestamp, timestamp_epochs, text,
-                 text_html, links, hashtags, has_media, img_urls, video_url, likes, retweets, replies, is_replied,
-                 is_reply_to, parent_tweet_id, reply_to_users):
-
-        Tw.__init__(self, screen_name=screen_name, username=username, user_id=user_id, tweet_id=tweet_id,
-                    tweet_url=tweet_url, timestamp=timestamp, timestamp_epochs=timestamp_epochs,
-                    text=text, text_html=text_html, links=links, hashtags=hashtags, has_media=has_media,
-                    img_urls=img_urls, video_url=video_url, likes=likes, retweets=retweets, replies=replies,
-                    is_replied=is_replied, is_reply_to=is_reply_to, parent_tweet_id=parent_tweet_id,
-                    reply_to_users=reply_to_users)
+class Tweet:
+    def __init__(self, screen_name, username, user_id, timestamp, text, likes, retweets, emojis, comments, image_link,
+                 URL):
+        #id based on the text so if duplicates happen they have the same ID
+        self.id = hashlib.sha1(str.encode(text)).hexdigest()
+        #user id generated in the same way
+        self.user_id = user_id
+        self.screen_name = screen_name
+        self.username = username
+        self.timestamp = timestamp
+        self.text = text
+        self.emojis = emojis
+        self.comments = comments
+        self.likes = likes
+        self.retweets = retweets
+        self.image_link = image_link
+        self.URL = URL
 
     def __str__(self):
         return "Tweet(username = {}, timestamp = {})".format(self.username, self.timestamp)
@@ -21,7 +27,6 @@ class Tweet(Tw):
 class TweetList:
     def __init__(self, name):
         self.name = name
-        self.id = str(uuid.uuid4())
         self.tweets = list()
 
     def add_tweet(self, tweet):
@@ -45,20 +50,16 @@ class TweetDA:
         directory = str(path)
         self.conn = sqlite3.connect(directory + '/sqlite_db/tweets.db')
         self.cursor = self.conn.cursor()
-        self.cursor.execute("""CREATE TABLE IF NOT EXISTS Tweets (screen_name string , username string,
-        user_id string, tweet_id string PRIMARY KEY, tweet_url string, timestamp string, timestamp_epochs string, 
-        text string, text_html string, links string, hashtags string, has_media string, img_urls string,
-        video_url string, likes integer, retweets integer, replies integer, is_replied string,
-                 is_reply_to string, parent_tweet_id string, reply_to_users string)""")
+        self.cursor.execute("""CREATE TABLE IF NOT EXISTS Tweets (tweet_id string PRIMARY KEY, screen_name string , 
+        username string, user_id string, timestamp string, text string, likes integer, retweets integer, emojis string,
+        comments integer, image_link string, URL string)""")
         self.conn.commit()
 
     def save_tweet(self, twt):
         self.cursor = self.conn.cursor()
-        data = (twt.screen_name, twt.username, twt.user_id, twt.tweet_id, twt.tweet_url, twt.timestamp,
-                twt.timestamp_epochs, twt.text, twt.text_html, twt.links, twt.hashtags, twt.has_media, twt.img_urls,
-                twt.video_url, twt.likes, twt.retweets, twt.replies, twt.is_replied, twt.is_reply_to,
-                twt.parent_tweet_id, twt.reply_to_users)
-        self.cursor.execute('INSERT INTO Tweets VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', data)
+        data = (twt.tweet_id, twt.screen_name, twt.username, twt.user_id, twt.timestamp, twt.text,
+                twt.likes, twt.retweets, twt.emojis, twt.comments, twt.image_link, twt.URL)
+        self.cursor.execute('INSERT OR REPLACE INTO Tweets VALUES (?,?,?,?,?,?,?,?,?,?,?,?)', data)
         self.conn.commit()
 
     def load_tweet(self, id=None):
@@ -68,20 +69,47 @@ class TweetDA:
             self.conn.commit()
         else:
             raise ValueError("you need to give id")
-        return Tweet(out[0], out[1], out[2], out[3], out[4], out[5], out[6], out[7], out[8], out[9], out[10], out[11],
-                     out[12], out[13], out[14], out[15], out[16], out[17], out[18], out[19], out[20])
+        #Tweet ID is determined from the text so it doesnt have to be passed
+        return Tweet(screen_name=out[1], username=out[2], user_id=out[3], timestamp=out[4],
+                     text=out[5], likes=out[6], retweets=out[7], emojis=out[8], comments=out[9], image_link=out[10],
+                     URL=out[11])
+
+    def user_has_tweets(self, username):
+        """
+        checks whether a user already has tweets in the DB
+        :param username: e.g @POTUS
+        :return: True (if exists), False (if not)
+        """
+        self.cursor = self.conn.cursor()
+        out = self.cursor.execute("""SELECT EXISTS(SELECT 1 FROM tweets WHERE username = '{}')""".format(username)).fetchone()
+        if out[0] == 1:
+            return True
+        else:
+            return False
+
+    def get_last_entry_date(self, username):
+        twts = self.load_all(username=username)
+        last_date = dt.datetime(100, 1, 1)
+        for twt in twts:
+            date = dt.datetime.strptime(twt.timestamp, '%Y-%m-%dT%H:%M:%S.000Z')
+            if date > last_date:
+                last_date = date
+        return last_date
 
     def save_list(self, twt_list):
         DA = TweetDA()
         for twt in twt_list:
             DA.save_tweet(twt)
 
-    def load_all(self, screen_name):
+    def load_all(self, screen_name=None, username=None):
         self.cursor = self.conn.cursor()
         output = TweetList("output")
-        query = self.cursor.execute("SELECT * FROM tweets WHERE screen_name = '{}'".format(screen_name)).fetchall()
+        if screen_name is not None:
+            query = self.cursor.execute("SELECT * FROM tweets WHERE screen_name = '{}'".format(screen_name)).fetchall()
+        elif username is not None:
+            query = self.cursor.execute("SELECT * FROM tweets WHERE username = '{}'".format(screen_name)).fetchall()
         for out in query:
-            _ = Tweet(out[0], out[1], out[2], out[3], out[4], out[5], out[6], out[7], out[8], out[9], out[10], out[11],
-                      out[12], out[13], out[14], out[15], out[16], out[17], out[18], out[19], out[20])
+            _ = Tweet(screen_name=out[1], username=out[2], user_id=out[3], timestamp=out[4], text=out[5], likes=out[6],
+                      retweets=out[7], emojis=out[8], comments=out[9], image_link=out[10], URL=out[11])
             output.add_tweet(_)
         return output
