@@ -75,6 +75,12 @@ class TwitterUserList:
     def __getitem__(self, item):
         return self.users[item]
 
+    def __eq__(self, other):
+        for i, user in enumerate(self):
+            if user != other[i]:
+                return False
+        return True
+
 
 class TwitterUserDA:
     def __init__(self):
@@ -103,7 +109,6 @@ class TwitterUserDA:
             self.conn.commit()
         else:
             raise ValueError("you need to use a name or id")
-        print(out)
         if out:
             return TwitterUser(username=out[1], location=out[2], description=out[3], date_joined=out[4],
                                following=out[5], followers=out[6])
@@ -119,7 +124,8 @@ class TwitterUserDA:
         self.cursor = self.conn.cursor()
         query = self.cursor.execute('SELECT * FROM TwitterUser').fetchall()
         output = TwitterUserList("output")
-        for entry in query:
-            _ = TwitterUser(entry[1], entry[2], entry[3], entry[4], entry[5], entry[0], entry[6], entry[7], entry[8])
+        for out in query:
+            _ = TwitterUser(username=out[1], location=out[2], description=out[3], date_joined=out[4],
+                               following=out[5], followers=out[6])
             output.add_user(_)
         return output

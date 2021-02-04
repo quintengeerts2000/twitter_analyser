@@ -7,7 +7,7 @@ class Tweet:
     def __init__(self, screen_name, username, user_id, timestamp, text, likes, retweets, emojis, comments, image_link,
                  URL):
         #id based on the text so if duplicates happen they have the same ID
-        self.id = hashlib.sha1(str.encode(text)).hexdigest()
+        self.tweet_id = hashlib.sha1(str.encode(text)).hexdigest()
         #user id generated in the same way
         self.user_id = user_id
         self.screen_name = screen_name
@@ -23,6 +23,13 @@ class Tweet:
 
     def __str__(self):
         return "Tweet(username = {}, timestamp = {})".format(self.username, self.timestamp)
+
+    def __eq__(self, other):
+        for attr, value in self.__dict__.items():
+            if value != eval('other.'+attr):
+                print('not equal')
+                return False
+            return True
 
 class TweetList:
     def __init__(self, name):
@@ -44,13 +51,19 @@ class TweetList:
             string += '\n' + str(tweet)
         return string
 
+    def __eq__(self, other):
+        for i, twt in enumerate(self):
+            if twt != other[i]:
+                return False
+        return True
+
 class TweetDA:
     def __init__(self):
         path = Path(__file__).parents[1]
         directory = str(path)
         self.conn = sqlite3.connect(directory + '/sqlite_db/tweets.db')
         self.cursor = self.conn.cursor()
-        self.cursor.execute("""CREATE TABLE IF NOT EXISTS Tweets (tweet_id string PRIMARY KEY, screen_name string , 
+        self.cursor.execute("""CREATE TABLE IF NOT EXISTS tweets (tweet_id string PRIMARY KEY, screen_name string , 
         username string, user_id string, timestamp string, text string, likes integer, retweets integer, emojis string,
         comments integer, image_link string, URL string)""")
         self.conn.commit()
@@ -59,13 +72,13 @@ class TweetDA:
         self.cursor = self.conn.cursor()
         data = (twt.tweet_id, twt.screen_name, twt.username, twt.user_id, twt.timestamp, twt.text,
                 twt.likes, twt.retweets, twt.emojis, twt.comments, twt.image_link, twt.URL)
-        self.cursor.execute('INSERT OR REPLACE INTO Tweets VALUES (?,?,?,?,?,?,?,?,?,?,?,?)', data)
+        self.cursor.execute('INSERT OR REPLACE INTO tweets VALUES (?,?,?,?,?,?,?,?,?,?,?,?)', data)
         self.conn.commit()
 
     def load_tweet(self, id=None):
         self.cursor = self.conn.cursor()
         if id is not None:
-            out = self.cursor.execute('SELECT * FROM tweets WHERE tweet_id = {}'.format(str(id))).fetchone()
+            out = self.cursor.execute("SELECT * FROM tweets WHERE tweet_id = '{}'".format(str(id))).fetchone()
             self.conn.commit()
         else:
             raise ValueError("you need to give id")
@@ -107,7 +120,7 @@ class TweetDA:
         if screen_name is not None:
             query = self.cursor.execute("SELECT * FROM tweets WHERE screen_name = '{}'".format(screen_name)).fetchall()
         elif username is not None:
-            query = self.cursor.execute("SELECT * FROM tweets WHERE username = '{}'".format(screen_name)).fetchall()
+            query = self.cursor.execute("SELECT * FROM tweets WHERE username = '{}'".format(username)).fetchall()
         for out in query:
             _ = Tweet(screen_name=out[1], username=out[2], user_id=out[3], timestamp=out[4], text=out[5], likes=out[6],
                       retweets=out[7], emojis=out[8], comments=out[9], image_link=out[10], URL=out[11])
