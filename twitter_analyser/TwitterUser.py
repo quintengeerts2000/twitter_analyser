@@ -8,10 +8,13 @@ from Trade import Trade, TradeList, TradeDA
 
 class TwitterUser:
     def __init__(self, username="", location="", description="", date_joined="", following='',
-                 followers=0, saved_tweets=None, trades=None, stock_comments=None):
+                 followers=0, saved_tweets=None, trades=None, stock_comments=None, id=None):
         self.username = username
         #generate unique id from hash function
-        self.user_id = hashlib.sha1(str.encode(self.username)).hexdigest()
+        if id is None:
+            self.user_id = hashlib.sha1(str.encode(self.username)).hexdigest()
+        else:
+            self.user_id = id
         self.location = location
         self.description = description
         self.date_joined = date_joined
@@ -111,7 +114,7 @@ class TwitterUserDA:
             raise ValueError("you need to use a name or id")
         if out:
             return TwitterUser(username=out[1], location=out[2], description=out[3], date_joined=out[4],
-                               following=out[5], followers=out[6])
+                               following=out[5], followers=out[6], id=out[0])
         else:
             return None
 
@@ -126,6 +129,6 @@ class TwitterUserDA:
         output = TwitterUserList("output")
         for out in query:
             _ = TwitterUser(username=out[1], location=out[2], description=out[3], date_joined=out[4],
-                               following=out[5], followers=out[6])
+                            following=out[5], followers=out[6], id=out[0])
             output.add_user(_)
         return output

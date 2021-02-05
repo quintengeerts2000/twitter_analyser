@@ -1,5 +1,6 @@
 from Tweet import *
 from TwitterUser import *
+import TwitterAPI as Tapi
 from Scweet.scweet import scrap
 import hashlib
 import os.path
@@ -8,18 +9,21 @@ import pandas as pd
 from Scweet.user import get_user_information
 from Scweet.utils import get_last_date_from_csv
 import datetime as dt
+from constants import cons_key, cons_secret, token, token_secret
+
+
 
 class TwitterScraper:
     def __init__(self, username):
         #create a list to store the tweets
         self.tweets = TweetList('{}'.format(username))
-        self.username = username
+        self.username = username.replace('@', '')
         self.user = TwitterUserDA().load_user(username=username)
         if self.user is None:
             self.check_user_info()
 
     def get_tweets(self, start, end, resume=False):
-        scrap(start_date=start, max_date=end, from_account=self.user.username, interval=5,
+        scrap(start_date=start, max_date=end, from_account=self.username, interval=5,
               headless=True, display_type="Top", hashtag=None, save_images=False, show_images=False, resume=resume)
 
     def check_user_info(self):
@@ -27,18 +31,24 @@ class TwitterScraper:
         Searches for twitter user profile and saves the data
         :return:
         """
-        out = get_user_information([self.username], headless=True)
-        info = out[self.username]
-        following = info[0]
-        followers = info[1]
-        join_date = info[2]
-        location = info[4]
-        description = info[6]
-        user_id = hashlib.sha1(str.encode(self.username)).hexdigest()
-        self.user = TwitterUser( username=self.username, location=location, description=description,
-                                 date_joined=join_date, following=following, followers=followers)
-        # save this user
-        TwitterUserDA().save_user(self.user)
+        api = Tapi.TwitterAPI(cons_key, cons_secret, token, token_secret)
+        out = api.request('users/lookup', {'Name': '{}'.format(self.username), 'screen_name': '{}'.format(self.username)})
+        if out is not None:
+            for i in out:
+                info = i
+            following = info['friends_count']
+            followers = info['followers_count']
+            join_date = info['created_at']
+            location = info['location']
+            description = info['description']
+            user_id = info['id_str']
+            self.user = TwitterUser(username=info['screen_name'], location=location, description=description,
+                                    date_joined=join_date, following=following, followers=followers,id=user_id)
+            # save this user
+            TwitterUserDA().save_user(self.user)
+        else:
+            self.user = TwitterUser(username=self.username, location="", description="*manually created*",
+                                    date_joined="Joined June 2009", following='', followers='')
 
     def _parse_csv(self, fname):
         #create function to help with converting the csv to a tweetlist
@@ -55,8 +65,6 @@ class TwitterScraper:
     def create_database(self):
         #check if user already has tweets in DB
         DA = TweetDA()
-        #TODO: remove below
-        self.user.date_joined = 'Joined January 2021'
         if DA.user_has_tweets(self.username):
             #if he has tweets get the last tweet entry in the DB
             start = DA.get_last_entry_date(self.username)
@@ -66,8 +74,7 @@ class TwitterScraper:
             start = start.strftime('%Y-%m-%d')
         else:
             # find the date to start
-            string = str(self.user.date_joined).replace("Joined ", "")
-            start = dt.datetime.strptime(string, '%B %Y')
+            start = dt.datetime.strptime(self.user.date_joined, '%a %b %d %H:%M:%S +0000 %Y')
             end = (start + dt.timedelta(days=10)).strftime('%Y-%m-%d')
             start = start.strftime('%Y-%m-%d')
             # find the date to end
@@ -88,3 +95,17 @@ class TwitterScraper:
             end = (dt.datetime.strptime(start, '%Y-%m-%d') + dt.timedelta(days=10)).strftime('%Y-%m-%d')
             # check if we need a new iteration
             working = dt.datetime.strptime(end, '%Y-%m-%d') < final_date
+
+class DBcreator:
+    def __init__(self):
+        pass
+
+
+if __name__ == '__main__':
+    #list of twitter users I want to scrape:
+    users_to_scrape = ['traderstewie', 'jmoneystonks', 'Thrackx', 'thetradejourney', 'TraderAmogh', 'JackDamn',
+                       'Scelliott81']
+    for usr in users_to_scrape:
+        print("\n+++++++++++++++++++++{}++++++++++++++++++++++++".format(usr + ' starting') * 100)
+        TwitterScraper(usr).create_database()
+        print("\n+++++++++++++++++++++{}++++++++++++++++++++++++".format(usr + ' finished')*100)

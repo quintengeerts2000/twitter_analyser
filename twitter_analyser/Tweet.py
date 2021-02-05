@@ -5,7 +5,7 @@ import datetime as dt
 
 class Tweet:
     def __init__(self, screen_name, username, user_id, timestamp, text, likes, retweets, emojis, comments, image_link,
-                 URL):
+                 URL, is_reply=None, is_reply_to=None):
         #id based on the text so if duplicates happen they have the same ID
         self.tweet_id = hashlib.sha1(str.encode(text)).hexdigest()
         #user id generated in the same way
@@ -13,6 +13,19 @@ class Tweet:
         self.screen_name = screen_name
         self.username = username
         self.timestamp = timestamp
+        if is_reply is None:
+            if "Replying to" in text:
+                self.is_reply = True
+                text = text.replace("Replying to", "")
+                for i, t in enumerate(text.split()):
+                    if t.startswith('@') and i == 0:
+                        self.is_reply_to = t
+            else:
+                self.is_reply = False
+                self.is_reply_to = ''
+        else:
+            self.is_reply = is_reply
+            self.is_reply_to = is_reply_to
         self.text = text
         self.emojis = emojis
         self.comments = comments
@@ -22,11 +35,23 @@ class Tweet:
         self.URL = URL
 
     def __str__(self):
-        return "==========================================================================\n{}: {} * {} \n{}" \
-               " \n--------------------------------------------------------------------------".format(self.screen_name,
-                                                                                                      self.username,
-                                                                                                      self.timestamp,
-                                                                                                      self.text)
+        if not self.is_reply:
+            string = """==========================================================================
+{}: {} * {}
+{}
+--------------------------------------------------------------------------""".format(self.screen_name,
+                                                                                     self.username, self.timestamp,
+                                                                                     self.text)
+        else:
+            string = """==========================================================================
+{}: {} * {}
+is reply to: {}
+{}
+--------------------------------------------------------------------------""".format(self.screen_name, self.username,
+                                                                                     self.timestamp, self.is_reply_to,
+                                                                                     self.text)
+        return string
+
 
     def __eq__(self, other):
         for attr, value in self.__dict__.items():
@@ -69,14 +94,15 @@ class TweetDA:
         self.cursor = self.conn.cursor()
         self.cursor.execute("""CREATE TABLE IF NOT EXISTS tweets (tweet_id string PRIMARY KEY, screen_name string , 
         username string, user_id string, timestamp string, text string, likes integer, retweets integer, emojis string,
-        comments integer, image_link string, URL string)""")
+        comments integer, image_link string, URL string, is_reply bool, is_reply_to string)""")
         self.conn.commit()
 
     def save_tweet(self, twt):
         self.cursor = self.conn.cursor()
         data = (twt.tweet_id, twt.screen_name, twt.username, twt.user_id, twt.timestamp, twt.text,
-                twt.likes, twt.retweets, twt.emojis, twt.comments, twt.image_link, twt.URL)
-        self.cursor.execute('INSERT OR REPLACE INTO tweets VALUES (?,?,?,?,?,?,?,?,?,?,?,?)', data)
+                twt.likes, twt.retweets, twt.emojis, twt.comments, twt.image_link, twt.URL, twt.is_reply,
+                twt.is_reply_to)
+        self.cursor.execute('INSERT OR REPLACE INTO tweets VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)', data)
         self.conn.commit()
 
     def load_tweet(self, id=None):
@@ -89,7 +115,7 @@ class TweetDA:
         #Tweet ID is determined from the text so it doesnt have to be passed
         return Tweet(screen_name=out[1], username=out[2], user_id=out[3], timestamp=out[4],
                      text=out[5], likes=out[6], retweets=out[7], emojis=out[8], comments=out[9], image_link=out[10],
-                     URL=out[11])
+                     URL=out[11], is_reply=out[12], is_reply_to=out[13])
 
     def user_has_tweets(self, username):
         """
@@ -118,7 +144,7 @@ class TweetDA:
         for twt in twt_list:
             DA.save_tweet(twt)
 
-    def load_all(self, screen_name=None, username=None):
+    def load_all(self, username=None, screen_name=None):
         self.cursor = self.conn.cursor()
         output = TweetList("output")
         if screen_name is not None:
@@ -127,9 +153,8 @@ class TweetDA:
             query = self.cursor.execute("SELECT * FROM tweets WHERE username = '{}'".format(username)).fetchall()
         for out in query:
             _ = Tweet(screen_name=out[1], username=out[2], user_id=out[3], timestamp=out[4], text=out[5], likes=out[6],
-                      retweets=out[7], emojis=out[8], comments=out[9], image_link=out[10], URL=out[11])
+                      retweets=out[7], emojis=out[8], comments=out[9], image_link=out[10], URL=out[11], is_reply=out[12],
+                      is_reply_to=out[13])
             output.add_tweet(_)
         return output
 
-DA = TweetDA()
-print(DA.load_all(username='@traderstewie'))
