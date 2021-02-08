@@ -2,7 +2,6 @@ from Tweet import *
 from TwitterUser import *
 import TwitterAPI as Tapi
 from Scweet.scweet import scrap
-import hashlib
 import os.path
 import os
 import pandas as pd
@@ -15,14 +14,20 @@ from constants import cons_key, cons_secret, token, token_secret
 
 class TwitterScraper:
     def __init__(self, username):
+        """
+        :param username:
+        """
         #create a list to store the tweets
         self.tweets = TweetList('{}'.format(username))
+        #remove the @ sign for convenience
         self.username = username.replace('@', '')
+        #load the user from db
         self.user = TwitterUserDA().load_user(username=username)
         if self.user is None:
             self.check_user_info()
 
     def get_tweets(self, start, end, resume=False):
+        #get the tweets using selenium
         scrap(start_date=start, max_date=end, from_account=self.username, interval=5,
               headless=True, display_type="Top", hashtag=None, save_images=False, show_images=False, resume=resume)
 
@@ -31,7 +36,9 @@ class TwitterScraper:
         Searches for twitter user profile and saves the data
         :return:
         """
+        #connect to the api
         api = Tapi.TwitterAPI(cons_key, cons_secret, token, token_secret)
+        #get request
         out = api.request('users/lookup', {'Name': '{}'.format(self.username), 'screen_name': '{}'.format(self.username)})
         if out is not None:
             for i in out:
@@ -42,6 +49,7 @@ class TwitterScraper:
             location = info['location']
             description = info['description']
             user_id = info['id_str']
+            #create user
             self.user = TwitterUser(username=info['screen_name'], location=location, description=description,
                                     date_joined=join_date, following=following, followers=followers,id=user_id)
             # save this user
@@ -66,8 +74,17 @@ class TwitterScraper:
         #check if user already has tweets in DB
         DA = TweetDA()
         if DA.user_has_tweets(self.username):
+            print('there are tweets')
             #if he has tweets get the last tweet entry in the DB
             start = DA.get_last_entry_date(self.username)
+            #add 10 days
+            end = (start + dt.timedelta(days=10)).strftime('%Y-%m-%d')
+            #form string
+            start = start.strftime('%Y-%m-%d')
+        elif DA.user_has_tweets('@'+self.username):
+            print('there are tweets')
+            #if he has tweets get the last tweet entry in the DB
+            start = DA.get_last_entry_date('@'+self.username)
             #add 10 days
             end = (start + dt.timedelta(days=10)).strftime('%Y-%m-%d')
             #form string
@@ -83,7 +100,8 @@ class TwitterScraper:
         while working:
             #get the tweets
             self.get_tweets(start, end, resume=False)
-            fname = 'outputs/{}_{}_{}.csv'.format(self.username, start, end) #name of file
+            # name of file
+            fname = 'outputs/{}_{}_{}.csv'.format(self.username, start, end)
             #turn the csv to tweetlist
             twts = self._parse_csv(fname)
             #save the tweetlist in the db
@@ -100,12 +118,15 @@ class DBcreator:
     def __init__(self):
         pass
 
+users_to_scrape = ['@traderstewie', '@jmoneystonks', '@Thrackx', '@thetradejourney', '@TraderAmogh', '@JackDamn',
+                   '@Scelliott81','@TradeWithNinja', '@CitronResearch', '@MartyChargin', '@AdamMancini',
+                   '@HiddenPivots', '@Pharmdca', '@Trader182', '@ChartingOptions', '87AlwaysRed', 'AshwinSamant',
+                   'AvatarAidan', 'gvstrader', 'markminervini', 'yatesinvesting']
 
-if __name__ == '__main__':
+if __name__ != '__main__':
     #list of twitter users I want to scrape:
-    users_to_scrape = ['traderstewie', 'jmoneystonks', 'Thrackx', 'thetradejourney', 'TraderAmogh', 'JackDamn',
-                       'Scelliott81']
     for usr in users_to_scrape:
         print("\n+++++++++++++++++++++{}++++++++++++++++++++++++".format(usr + ' starting') * 100)
         TwitterScraper(usr).create_database()
         print("\n+++++++++++++++++++++{}++++++++++++++++++++++++".format(usr + ' finished')*100)
+

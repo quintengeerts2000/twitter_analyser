@@ -5,14 +5,30 @@ import datetime as dt
 
 class Tweet:
     def __init__(self, screen_name, username, user_id, timestamp, text, likes, retweets, emojis, comments, image_link,
-                 URL, is_reply=None, is_reply_to=None):
+                 URL, is_reply=None, is_reply_to=''):
+        """
+        :param screen_name: same as username
+        :param username:
+        :param user_id: twitter id
+        :param timestamp: format: "YYYY-MM-DDThh:mm:ss.000Z:"
+        :param text: body of the tweet
+        :param likes: amount of likes
+        :param retweets: amount of retweets
+        :param emojis: the emojis in the tweet
+        :param comments: amount of comments
+        :param image_link: if it contains an image this is the link
+        :param URL: url of the tweet
+        :param is_reply: if the tweet was a reply
+        :param is_reply_to: if it was a reply then to whom
+        """
         #id based on the text so if duplicates happen they have the same ID
-        self.tweet_id = hashlib.sha1(str.encode(text)).hexdigest()
+        self.tweet_id = str(hashlib.sha1(str.encode(str(text))).hexdigest())
         #user id generated in the same way
         self.user_id = user_id
         self.screen_name = screen_name
         self.username = username
         self.timestamp = timestamp
+        self.is_reply_to = is_reply_to
         if is_reply is None:
             if "Replying to" in text:
                 self.is_reply = True
@@ -62,6 +78,10 @@ is reply to: {}
 
 class TweetList:
     def __init__(self, name):
+        """
+        used to store multiple tweets
+        :param name:
+        """
         self.name = name
         self.tweets = list()
 
@@ -88,8 +108,12 @@ class TweetList:
 
 class TweetDA:
     def __init__(self):
+        """
+        used to store tweet and tweetlist objects
+        """
         path = Path(__file__).parents[1]
         directory = str(path)
+        #connect to the db
         self.conn = sqlite3.connect(directory + '/sqlite_db/tweets.db')
         self.cursor = self.conn.cursor()
         self.cursor.execute("""CREATE TABLE IF NOT EXISTS tweets (tweet_id string PRIMARY KEY, screen_name string , 
@@ -131,6 +155,11 @@ class TweetDA:
             return False
 
     def get_last_entry_date(self, username):
+        """
+        returns the last tweet in the db for a given user
+        :param username: handle
+        :return: format: date in format:"YYYY-MM-DDThh:mm:ss.000Z"
+        """
         twts = self.load_all(username=username)
         last_date = dt.datetime(100, 1, 1)
         for twt in twts:
@@ -144,13 +173,15 @@ class TweetDA:
         for twt in twt_list:
             DA.save_tweet(twt)
 
-    def load_all(self, username=None, screen_name=None):
+    def load_all(self, username=None, screen_name=None, replies=False):
         self.cursor = self.conn.cursor()
         output = TweetList("output")
         if screen_name is not None:
-            query = self.cursor.execute("SELECT * FROM tweets WHERE screen_name = '{}'".format(screen_name)).fetchall()
+            query = self.cursor.execute("SELECT * FROM tweets WHERE screen_name = '{}' AND is_reply = {}".format(
+                screen_name, replies)).fetchall()
         elif username is not None:
-            query = self.cursor.execute("SELECT * FROM tweets WHERE username = '{}'".format(username)).fetchall()
+            query = self.cursor.execute("SELECT * FROM tweets WHERE username = '{}' AND is_reply = {}".format(
+                username, replies)).fetchall()
         for out in query:
             _ = Tweet(screen_name=out[1], username=out[2], user_id=out[3], timestamp=out[4], text=out[5], likes=out[6],
                       retweets=out[7], emojis=out[8], comments=out[9], image_link=out[10], URL=out[11], is_reply=out[12],
