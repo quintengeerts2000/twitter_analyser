@@ -67,7 +67,7 @@ class TwitterUserList:
         self.users.remove(usr)
 
     def add_all_users(self, user_list):
-        self.users.append(user_list)
+        self.users.append(user_list.users)
 
     def __str__(self):
         out_str = ''

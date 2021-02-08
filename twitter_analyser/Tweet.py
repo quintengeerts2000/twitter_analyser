@@ -91,6 +91,9 @@ class TweetList:
     def remove_tweet(self, tweet):
         self.tweets.remove(tweet)
 
+    def add_all_tweets(self, tweet_list):
+        self.tweets += tweet_list.tweets
+
     def __getitem__(self, item):
         return self.tweets[item]
 
